@@ -39,10 +39,10 @@ void example1() {
   printf("value: %d\n", t.get().value());
 }
 
-task<int> emptry() { co_return 0; }
+task<int> emptry() { co_return 2; }
 task<int> async_func2() {
-  co_await emptry();
-  co_return 0;
+  int ret = co_await emptry();
+  co_return ret;
 }
 void example2() {
   auto t = async_func2();
