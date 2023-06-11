@@ -1,0 +1,16 @@
+==18505== Memcheck, a memory error detector
+==18505== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==18505== Using Valgrind-3.21.0 and LibVEX; rerun with -h for copyright info
+==18505== Command: ./build/test
+==18505== 
+sleep after 1s
+value: 0
+value: 0
+==18505== 
+==18505== HEAP SUMMARY:
+==18505==     in use at exit: 0 bytes in 0 blocks
+==18505==   total heap usage: 7 allocs, 7 frees, 75,296 bytes allocated
+==18505== 
+==18505== All heap blocks were freed -- no leaks are possible
+==18505== 
+==18505== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
