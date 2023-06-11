@@ -76,10 +76,10 @@ template <class T> struct task {
   explicit task(promise_type *p) : _h(handle::from_promise(*p)) {}
   task(task &) = delete;
   task(task &&t) : _h(t._coro) { t._h = nullptr; }
-  ~task() {
-    if (_h)
-      _h.destroy();
-  }
+  /* ~task() { */
+  /*   if (_h) */
+  /*     _h.destroy(); */
+  /* } */
 
   // 把当前coroutine的handle传给await_suspend，让子协程结束的时候恢复当前协程
   auto operator co_await() {
