@@ -1,5 +1,4 @@
 #pragma once
-#include "concepts.hpp"
 #ifndef _COROUTINE_HPP_
 #define _COROUTINE_HPP_
 
@@ -14,14 +13,14 @@
 // 协程内部创建其它协程对象的时候也会自动开始运行
 // 当协程最内部，因为co_await而无法继续执行的时候，控制权开始组层往上层传递
 // 也就是回到刚刚调用co_await async_func的位置
-// 这时我们重载了task::operator co_await，在子协程的handle中保存了当前协程的handle
+// 这时我们重载了task::operator
+// co_await，在子协程的handle中保存了当前协程的handle
 // 以此往上直到最外层，所有的子协程都保存了父协程的handle
 // 此时协程无法继续运行，将控制权提交给最外层调用协程的地方
 // 等到polling时，callback恢复最内层的协程，这时最内层的协程会将控制权交给父协程
 // 我们定义了final_suspend的返回值，让其在suspend的时候恢复父协程
 // 以此类推，直到最外层的协程，这时整个协程运行结束
 // 然后可以通过get()获取返回值，如果还没有返回值，get()会返回std::nullopt，出现错误
-
 
 // 在协程内部，我们可以使用co_await current{}来获取当前协程的handle
 // for get current coroutine handle
@@ -39,14 +38,15 @@ struct current {
 };
 
 // 每个协程都有一个caller，当协程结束的时候，final_suspend返回caller
-template<class T>
-struct task {
+template <class T> struct task {
   struct promise_type {
     std::suspend_never initial_suspend() { return {}; }
-    task<T> get_return_object() { return task<T>(this); }
+    // 协程对象的返回值应该被使用
+    [[nodiscard]] task<T> get_return_object() { return task<T>(this); }
     // 避免协程在子协程中设置了返回值，但是父协程返回的是默认值
     void return_value(T value) {
-      if (!_value.has_value()) _value = value;
+      if (!_value.has_value())
+        _value = value;
     }
 
     [[noreturn]] static void unhandled_exception() { throw; }
@@ -58,12 +58,11 @@ struct task {
       }
       void await_resume() noexcept {}
       std::coroutine_handle<> _caller;
-      explicit resume_awaiter(std::coroutine_handle<> caller) : _caller(caller) {}
+      explicit resume_awaiter(std::coroutine_handle<> caller)
+          : _caller(caller) {}
       resume_awaiter() = delete;
     };
-    resume_awaiter final_suspend() noexcept {
-      return resume_awaiter(_caller);
-    }
+    resume_awaiter final_suspend() noexcept { return resume_awaiter(_caller); }
     // 禁止在其中使用co_await未知的类型
     /* void await_transform() = delete; */
     std::coroutine_handle<> _caller = std::noop_coroutine();
@@ -72,17 +71,22 @@ struct task {
   };
 
   using handle = std::coroutine_handle<promise_type>;
-  handle h_;
+  handle _h;
 
-  explicit task(promise_type *p) : h_(handle::from_promise(*p)) {}
+  explicit task(promise_type *p) : _h(handle::from_promise(*p)) {}
   task(task &) = delete;
-  task(task &&t) : h_(t._coro) { t.h_ = nullptr; }
+  task(task &&t) : _h(t._coro) { t._h = nullptr; }
+  ~task() {
+    if (_h)
+      _h.destroy();
+  }
 
   // 把当前coroutine的handle传给await_suspend，让子协程结束的时候恢复当前协程
   auto operator co_await() {
     struct awaitable {
       handle _callee;
-      bool await_ready() const noexcept { return false; }
+      // 有可能co_await的时候，协程已经结束了，这种情况下如果co_await等待，将没有人能唤醒它
+      bool await_ready() const noexcept { return _h.done(); }
 
       // 这里的callee是当前协程的handle，因为先构造了子协程的对象，然后
       // 调用callee::operator co_await()，然后因为在caller中调用了co_await
@@ -96,17 +100,15 @@ struct task {
       // 这个是co_await的返回值，也就是子协程的返回值
       T await_resume() { return _callee.promise()._value.value(); }
     };
-    return awaitable{h_};
+    return awaitable{_h};
   }
 
   // 还是不要定义这个函数了，因为协程很可能因为暂停了没有执行完
   /* T operator()() { */
-  /*   // h_.resume(); */
-  /*   return h_.promise()._value.value(); */
+  /*   // _h.resume(); */
+  /*   return _h.promise()._value.value(); */
   /* } */
-  std::optional<T> get() {
-    return h_.promise()._value;
-  }
+  std::optional<T> get() { return _h.promise()._value; }
 };
 
-#endif// _COROUTINE_HPP_
+#endif // _COROUTINE_HPP_
