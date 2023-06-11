@@ -86,7 +86,8 @@ template <class T> struct task {
     struct awaitable {
       handle _callee;
       // 有可能co_await的时候，协程已经结束了，这种情况下如果co_await等待，将没有人能唤醒它
-      bool await_ready() const noexcept { return _h.done(); }
+      bool await_ready() const noexcept { return _callee.done(); }
+      /* bool await_ready() const noexcept { return false; } */
 
       // 这里的callee是当前协程的handle，因为先构造了子协程的对象，然后
       // 调用callee::operator co_await()，然后因为在caller中调用了co_await
@@ -97,13 +98,14 @@ template <class T> struct task {
         // 事实上调用这个函数的时候callee已经执行完了
       }
 
-      // 这个是co_await的返回值，也就是子协程的返回值
+      // 这个是co_await的返回值，也就是子协程的返回值，可以保证await_resume的时候子协程已经结束了，所以返回值一定是有效的
       T await_resume() { return _callee.promise()._value.value(); }
     };
     return awaitable{_h};
   }
 
-  // 还是不要定义这个函数了，因为协程很可能因为暂停了没有执行完
+  T operator()() = delete;
+  // 还是不要定义这个函数了，因为协程很可能因为暂停了没有执行完，这样返回值是无效的
   /* T operator()() { */
   /*   // _h.resume(); */
   /*   return _h.promise()._value.value(); */
