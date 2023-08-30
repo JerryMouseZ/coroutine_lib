@@ -39,9 +39,9 @@ void example1() {
   printf("value: %d\n", t.get().value());
 }
 
-task<int> emptry() { co_return 2; }
+task<int> empty() { co_return 2; }
 task<int> async_func2() {
-  int ret = co_await emptry();
+  int ret = co_await empty();
   co_return ret;
 }
 void example2() {
