@@ -9,7 +9,7 @@
 void async_callback(void *args) {
   std::coroutine_handle<task<int>::promise_type> handle =
       std::coroutine_handle<task<int>::promise_type>::from_address(args);
-  handle.promise()._value = 0;
+  handle.promise()._value = 1;
   handle.resume();
 }
 
@@ -25,19 +25,19 @@ void async_with_callback(std::function<void(void *)> callback, void *address) {
 task<int> async_func() {
   printf("async_func begin\n");
   auto handle = co_await current{};
-  async_with_callback(async_callback, handle.address());
   printf("before suspend\n");
+  async_with_callback(async_callback, handle.address());
   co_await std::suspend_always{};
   printf("async_func done\n");
   co_return 0;
 }
 
 TEST_CASE("resume from subroutine", "subroutine") {
-  auto t = async_func();
+  task<int> t = async_func();
   // polling
   while (!t._h.promise()._value.has_value())
     ;
-  printf("value: %d\n", t.get().value());
+  REQUIRE(t.get().value() == 1);
 }
 
 task<int> empty() { co_return 2; }
@@ -48,7 +48,7 @@ task<int> async_func2() {
 
 TEST_CASE("resume from empty", "empty") {
   auto t = async_func2();
-  printf("value: %d\n", t.get().value());
+  REQUIRE(t.get().value() == 2);
 }
 
 task<int> async_wrapper() {
@@ -61,5 +61,5 @@ TEST_CASE("subroutine wrapper", "subroutine") {
   // polling
   while (!t._h.promise()._value.has_value())
     ;
-  printf("value: %d\n", t.get().value());
+  REQUIRE(t.get().value() == 1);
 }
