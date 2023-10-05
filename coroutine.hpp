@@ -7,6 +7,16 @@
 #include <cstdio>
 #include <optional>
 
+#ifndef NDEBUG
+#define DEBUG_PRINTF(...)                                                      \
+  do {                                                                         \
+    fprintf(stderr, "[%s:%d]: ", __FILE__, __LINE__);                          \
+    fprintf(stderr, __VA_ARGS__);                                              \
+  } while (0);
+#else
+#define DEBUG_PRINTF(...) void(0)
+#endif // !NDEBUG
+
 // 协程类定义
 // 协程类支持自动的调度，在创建协程对象的时候，就会自动开始运行
 // 创建子协程的方法是co_await async_func()，async_func()返回一个协程对象
@@ -62,7 +72,10 @@ template <class T> struct task {
           : _caller(caller) {}
       resume_awaiter() = delete;
     };
-    resume_awaiter final_suspend() noexcept { return resume_awaiter(_caller); }
+    resume_awaiter final_suspend() noexcept {
+      DEBUG_PRINTF("final_suspend\n");
+      return resume_awaiter(_caller);
+    }
     // 禁止在其中使用co_await未知的类型
     /* void await_transform() = delete; */
     std::coroutine_handle<> _caller = std::noop_coroutine();
@@ -77,6 +90,7 @@ template <class T> struct task {
   task(task &) = delete;
   task(task &&t) : _h(t._coro) { t._h = nullptr; }
   ~task() {
+    DEBUG_PRINTF("destroy\n");
     if (_h)
       _h.destroy();
   }
@@ -99,13 +113,16 @@ template <class T> struct task {
       }
 
       // 这个是co_await的返回值，也就是子协程的返回值，可以保证await_resume的时候子协程已经结束了，所以返回值一定是有效的
-      T await_resume() { return _callee.promise()._value.value(); }
+      T await_resume() {
+        DEBUG_PRINTF("resume\n");
+        return _callee.promise()._value.value();
+      }
     };
     return awaitable{_h};
   }
 
-  T operator()() = delete;
   // 还是不要定义这个函数了，因为协程很可能因为暂停了没有执行完，这样返回值是无效的
+  T operator()() = delete;
   /* T operator()() { */
   /*   // _h.resume(); */
   /*   return _h.promise()._value.value(); */

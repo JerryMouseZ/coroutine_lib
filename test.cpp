@@ -1,4 +1,5 @@
 #include "coroutine.hpp"
+#include <catch2/catch_test_macros.hpp>
 #include <coroutine>
 #include <cstdio>
 #include <functional>
@@ -31,7 +32,7 @@ task<int> async_func() {
   co_return 0;
 }
 
-void example1() {
+TEST_CASE("resume from subroutine", "subroutine") {
   auto t = async_func();
   // polling
   while (!t._h.promise()._value.has_value())
@@ -44,11 +45,9 @@ task<int> async_func2() {
   int ret = co_await empty();
   co_return ret;
 }
-void example2() {
+
+TEST_CASE("resume from empty", "empty") {
   auto t = async_func2();
-  // polling
-  while (!t._h.promise()._value.has_value())
-    ;
   printf("value: %d\n", t.get().value());
 }
 
@@ -57,17 +56,10 @@ task<int> async_wrapper() {
   co_return ret;
 }
 
-void example3() {
+TEST_CASE("subroutine wrapper", "subroutine") {
   auto t = async_wrapper();
   // polling
   while (!t._h.promise()._value.has_value())
     ;
   printf("value: %d\n", t.get().value());
-}
-
-int main(int argc, char *argv[]) {
-  example1();
-  example2();
-  example3();
-  return 0;
 }
