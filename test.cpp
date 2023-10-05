@@ -6,37 +6,33 @@
 #include <thread>
 #include <unistd.h>
 
-void async_callback(void *args) {
-  std::coroutine_handle<task<int>::promise_type> handle =
-      std::coroutine_handle<task<int>::promise_type>::from_address(args);
-  handle.promise()._value = 1;
-  handle.resume();
-}
+struct wakable {
+  bool await_ready() const noexcept {
+    printf("await ready\n");
+    return false;
+  }
+  void await_suspend(std::coroutine_handle<> handle) {
+    printf("await suspend: %p\n", handle.address());
+    _h = handle;
+  }
+  void await_resume() {}
+  std::coroutine_handle<> _h;
+  void wakeup() { _h.resume(); }
+};
 
-// 严格来说callback要写在polling中，不过这样可以简单很多
-void async_with_callback(std::function<void(void *)> callback, void *address) {
-  std::thread([=]() {
-    sleep(1);
-    printf("sleep after 1s\n");
-    callback(address);
-  }).detach();
-}
-
-task<int> async_func() {
+task<int> async_func(wakable &w) {
   printf("async_func begin\n");
-  auto handle = co_await current{};
   printf("before suspend\n");
-  async_with_callback(async_callback, handle.address());
-  co_await std::suspend_always{};
+  co_await w;
   printf("async_func done\n");
-  co_return 0;
+  co_return 1;
 }
 
 TEST_CASE("resume from subroutine", "subroutine") {
-  task<int> t = async_func();
-  // polling
-  while (!t._h.promise()._value.has_value())
-    ;
+  wakable w{};
+  auto t = async_func(w);
+  printf("%pvs%p\n", t._h.address(), w._h.address());
+  w.wakeup();
   REQUIRE(t.get().value() == 1);
 }
 
@@ -51,15 +47,14 @@ TEST_CASE("resume from empty", "empty") {
   REQUIRE(t.get().value() == 2);
 }
 
-task<int> async_wrapper() {
-  int ret = co_await async_func();
+task<int> async_wrapper(wakable &w) {
+  int ret = co_await async_func(w);
   co_return ret;
 }
 
 TEST_CASE("subroutine wrapper", "subroutine") {
-  auto t = async_wrapper();
-  // polling
-  while (!t._h.promise()._value.has_value())
-    ;
+  wakable w;
+  auto t = async_wrapper(w);
+  w.wakeup();
   REQUIRE(t.get().value() == 1);
 }
