@@ -50,7 +50,7 @@ struct current {
 // 每个协程都有一个caller，当协程结束的时候，final_suspend返回caller
 template <class T> struct task {
   struct promise_type {
-    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_always initial_suspend() { return {}; }
     // 协程对象的返回值应该被使用
     [[nodiscard]] task<T> get_return_object() { return task<T>(this); }
     // 避免协程在子协程中设置了返回值，但是父协程返回的是默认值
@@ -106,8 +106,9 @@ template <class T> struct task {
       // 这里的callee是当前协程的handle，因为先构造了子协程的对象，然后
       // 调用callee::operator co_await()，然后因为在caller中调用了co_await
       // 所以这里的caller就是父协程的handle
-      void await_suspend(std::coroutine_handle<> caller) noexcept {
+      auto await_suspend(std::coroutine_handle<> caller) noexcept {
         _callee.promise()._caller = caller;
+        return _callee;
         // 因为我们将initial_suspend的返回值设置成了suspend_never，所以我们不需要将控制权转移到callee中
         // 事实上调用这个函数的时候callee已经执行完了
       }
@@ -128,6 +129,7 @@ template <class T> struct task {
   /*   return _h.promise()._value.value(); */
   /* } */
   std::optional<T> get() { return _h.promise()._value; }
+  void start() { _h.resume(); }
 };
 
 #endif // _COROUTINE_HPP_

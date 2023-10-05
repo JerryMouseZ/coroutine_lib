@@ -9,7 +9,7 @@
 void async_callback(void *args) {
   std::coroutine_handle<task<int>::promise_type> handle =
       std::coroutine_handle<task<int>::promise_type>::from_address(args);
-  handle.promise()._value = 0;
+  handle.promise()._value = 1;
   handle.resume();
 }
 
@@ -34,10 +34,11 @@ task<int> async_func() {
 
 TEST_CASE("resume from subroutine", "subroutine") {
   auto t = async_func();
+  t.start();
   // polling
   while (!t._h.promise()._value.has_value())
     ;
-  printf("value: %d\n", t.get().value());
+  REQUIRE(t.get().value() == 1);
 }
 
 task<int> empty() { co_return 2; }
@@ -48,7 +49,8 @@ task<int> async_func2() {
 
 TEST_CASE("resume from empty", "empty") {
   auto t = async_func2();
-  printf("value: %d\n", t.get().value());
+  t.start();
+  REQUIRE(t.get().value() == 2);
 }
 
 task<int> async_wrapper() {
@@ -58,8 +60,9 @@ task<int> async_wrapper() {
 
 TEST_CASE("subroutine wrapper", "subroutine") {
   auto t = async_wrapper();
+  t.start();
   // polling
   while (!t._h.promise()._value.has_value())
     ;
-  printf("value: %d\n", t.get().value());
+  REQUIRE(t.get().value() == 1);
 }
