@@ -2,6 +2,7 @@
 #ifndef _COROUTINE_HPP_
 #define _COROUTINE_HPP_
 
+#include <cassert>
 #include <concepts>
 #include <coroutine>
 #include <cstdio>
@@ -55,8 +56,8 @@ template <class T> struct task {
     [[nodiscard]] task<T> get_return_object() { return task<T>(this); }
     // 避免协程在子协程中设置了返回值，但是父协程返回的是默认值
     void return_value(T value) {
-      if (!_value.has_value())
-        _value = value;
+      assert(!_value.has_value());
+      _value = value;
     }
 
     [[noreturn]] static void unhandled_exception() { throw; }
